@@ -10,6 +10,8 @@ import torch.optim as optim
 import time
 
 class GraphConvolution(Module):
+    """Graph Convolutionの一層に相当"""
+
     def __init__(self, in_features, out_features, bias=True):
         super().__init__()
         self.in_features = in_features
@@ -23,6 +25,7 @@ class GraphConvolution(Module):
         self.reset_parameters()
         
     def reset_parameters(self):
+        """パラメータの初期値を設定"""
         stdv = 1 / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
@@ -35,17 +38,11 @@ class GraphConvolution(Module):
             return output + self.bias
         else:
             return output
-    
-    def __repr__(self):
-        return self.__class__.__name__ + "(" \
-                         + str(self.in_features) + " -> " \
-                        + str(self.out_features) + ")"
-
 
 class GCN(nn.Module):
+    """GCNのモデリングのモジュール"""
     def __init__(self, nfeat, nhid, nclass, dr_rate):
         super().__init__()
-        
         self.gc1 = GraphConvolution(nfeat, nhid)
         self.gc2 = GraphConvolution(nhid, nclass)
         self.dr_rate = dr_rate
@@ -56,38 +53,37 @@ class GCN(nn.Module):
         x = self.gc2(x, adj)
         return F.log_softmax(x, dim=1)
 
-
 def main(device):
     A, X, y, idx_train, idx_val, idx_test = load_data()
-    epochs = 200
-    lr = 0.01
-    weight_decay= 5e-4
-    hidden = 16
-    dr_rate = 0.5
-    n_class = len(np.unique(y.numpy()))
-
-    model = GCN(nfeat=X.shape[1], nhid=hidden, nclass=n_class, dr_rate=dr_rate)
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-
-    model = model.to(device)
     X = X.to(device)
     A = A.to(device)
     y = y.to(device)
     idx_train = idx_train.to(device)
     idx_val = idx_val.to(device)
     idx_test = idx_test.to(device)
+    EPOCH = 200
+    LEARNING_RATE = 0.01
+    weight_decay = 5e-4
+    hidden = 16
+    dr_rate = 0.5
+    n_class = len(np.unique(y.numpy()))
 
-    for epoch in range(epochs):
-        model.train() #train modeにしている
+    # modeling
+    model = GCN(nfeat=X.shape[1], nhid=hidden, nclass=n_class, dr_rate=dr_rate).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=weight_decay)
+
+    for epoch in range(EPOCH):
+        # train
+        model.train()
         optimizer.zero_grad()
         output = model(X, A)
         loss_train = F.nll_loss(output[idx_train], y[idx_train])
         acc_train = accuracy(output[idx_train], y[idx_train])
         loss_train.backward()
         optimizer.step()
-        # Evaluate validation set performance separately,
-        # deactivates dropout during validation run.
-        model.eval()
+        
+        # validation
+        model.eval() #val modeにしている
         output = model(X, A)
         loss_val = F.nll_loss(output[idx_val], y[idx_val])
         acc_val = accuracy(output[idx_val], y[idx_val])
@@ -98,6 +94,7 @@ def main(device):
           'loss_val: {:.4f}'.format(loss_val.item()),
           'acc_val: {:.4f}'.format(acc_val.item()))
     
+    # test
     model.eval()
     output = model(X, A)
     loss_test = F.nll_loss(output[idx_test], y[idx_test])
