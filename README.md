@@ -8,3 +8,7 @@ Kipf, Thomas N., and Max Welling. "Semi-supervised classification with graph con
 docker build -t gcn:latest .
 docker run gcn:latest
 ```
+## Execution
+```
+python main.py
+```
